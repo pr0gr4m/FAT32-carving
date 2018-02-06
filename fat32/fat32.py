@@ -100,7 +100,7 @@ class FAT32:
         )
         while cluster_num < self.free_cluster_count:
             self.data.seek(unalloc_cluster_offset)
-            sig = self.match_signature(self.data.read(0x20))
+            sig = self.match_signature(self.data.read(0x10))
             if sig:
                 print(cluster_num, "-", sig)
             cluster_num += 1
@@ -108,8 +108,33 @@ class FAT32:
 
     def match_signature(self, sig_data):
         # http://blog.naver.com/gaegurijump/110186211008
-        byte2 = unpack_from(">H", sig_data, 0x00)[0]
-        print(hex(byte2))
+        byte = unpack_from(">H", sig_data, 0x00)[0]
+        if byte == 0x4d5a:
+            return self.match_signature_exe(sig_data)
+        elif byte == 0x424d:
+            return "bmp"
+        elif byte == 0xffd8:
+            return "jpg"
+
+        byte = unpack_from(">L", sig_data, 0x00)[0]
+        if byte == 0x504b0304:
+            return self.match_signatrue_zip(sig_data)
+        elif byte == 0x25504446:
+            return "ai"
+        elif byte == 0x47494638:
+            return "gif"
+        elif byte == 0x89504e47:
+            return "png"
+        elif byte == 0x52494646:
+            return "avi"
+        elif byte == 0x25504446:
+            return "pdf"
+
+    def match_signature_exe(self, sig_data):
+        return "exe"
+
+    def match_signatrue_zip(self, sig_data):
+        return "zip"
 
 if __name__ == "__main__":
     fat = FAT32("I:\\")
