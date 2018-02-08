@@ -1,4 +1,5 @@
-import psutil, os, sys
+import psutil
+import sys
 from struct import *
 
 class FAT32:
@@ -10,6 +11,12 @@ class FAT32:
         self.parse_bootsector()
         self.parse_fsinfo()
         self.parse_fat()
+
+    def __del__(self):
+        try:
+            self.data.close()
+        except:
+            return
 
     def test_drive(self, drive):
         partition = {}
@@ -42,7 +49,6 @@ class FAT32:
         self.fsinfo_sector_offset = unpack_from('<H', bootsector, 0x30)[0]
         self.volume_label = unpack_from('<10s', bootsector, 0x47)[0]
         self.fs_type = unpack_from('<8s', bootsector, 0x52)[0]
-
         self.fat_size_byte = self.sector_to_byte(self.fat_size)
         self.cluster_count = int(self.fat_size_byte / 4)
         self.data_cluster_count = self.cluster_count - 2
@@ -68,19 +74,19 @@ class FAT32:
             print("Magic number of fsinfo is not 0x41615252")
             return
         self.free_cluster_count = unpack_from('<L', fsinfo, 0x1e8)[0]
-        self.next_cluster_location = unpack_from('<L', fsinfo, 0x1ec)[0]
+        self.next_free_cluster_location = unpack_from('<L', fsinfo, 0x1ec)[0]
 
         print("\t---------- FSInfo Information ----------")
         print("\tFree Cluster Count : ", self.free_cluster_count)
-        print("\tNext Cluster Location : ", self.next_cluster_location)
+        print("\tNext Cluster Location : ", self.next_free_cluster_location)
 
     def parse_fat(self):
         self.data.seek(self.sector_to_byte(self.reserved_sector))
         fat_metadata = self.data.read(0x08)
         self.fat_data_cluster = self.data.read(self.fat_size_byte - 0x08)
-
         media_type = hex(unpack_from('<L', fat_metadata, 0x00)[0])
         partition_status = hex(unpack_from('<L', fat_metadata, 0x04)[0])
+
         print("\t---------- FAT Information ----------")
         print("\tMedia Type : ", media_type)
         print("\tPartition Status : ", partition_status)
@@ -92,7 +98,7 @@ class FAT32:
         return self.sector_per_cluster * cluster
 
     def carving_unallocated(self):
-        cluster_num = self.next_cluster_location
+        cluster_num = self.next_free_cluster_location
         unalloc_cluster_offset = self.sector_to_byte(
             self.reserved_sector +
             self.fat_size * 2 +
@@ -100,44 +106,52 @@ class FAT32:
         )
         while cluster_num < self.free_cluster_count:
             self.data.seek(unalloc_cluster_offset)
-            sig = self.match_signature(self.data.read(0x10))
+            sig = self.match_signature(self.data.read(0x10), unalloc_cluster_offset)
             if sig:
-                print(cluster_num, "-", sig)
+                print(cluster_num + 1, "-", sig)    # start from cluster number 1
             cluster_num += 1
             unalloc_cluster_offset += self.sector_per_cluster * self.bytes_per_sector
 
-    def match_signature(self, sig_data):
-        # http://blog.naver.com/gaegurijump/110186211008
+    def match_signature(self, sig_data, offset):
         byte = unpack_from(">H", sig_data, 0x00)[0]
-        if byte == 0x4d5a:
-            return self.match_signature_exe(sig_data)
+        if byte == 0x4d5a:      # MZ
+            return "exe/dll"
         elif byte == 0x424d:
             return "bmp"
         elif byte == 0xffd8:
             return "jpg"
+        else:
+            byte = unpack_from(">L", sig_data, 0x00)[0]
+            if byte == 0x504b0304:      # zip
+                return self.match_signatrue_zip(offset)
+            elif byte == 0x25504446:
+                return "pdf"
+            elif byte == 0x47494638:
+                return "gif"
+            elif byte == 0x89504e47:
+                return "png"
+            elif byte == 0x52494646:
+                return "avi"
 
-        byte = unpack_from(">L", sig_data, 0x00)[0]
-        if byte == 0x504b0304:
-            return self.match_signatrue_zip(sig_data)
-        elif byte == 0x25504446:
-            return "ai"
-        elif byte == 0x47494638:
-            return "gif"
-        elif byte == 0x89504e47:
-            return "png"
-        elif byte == 0x52494646:
-            return "avi"
-        elif byte == 0x25504446:
-            return "pdf"
-
-    def match_signature_exe(self, sig_data):
-        return "exe"
-
-    def match_signatrue_zip(self, sig_data):
-        return "zip"
+    def match_signatrue_zip(self, offset):
+        self.data.seek(offset)
+        zip_data = self.data.read(0x1000)
+        zip_str = str(zip_data)
+        if "word/" in zip_str:
+            return "zip[docx]"
+        elif "ppt/" in zip_str:
+            return "zip[pptx]"
+        elif "xl/" in zip_str:
+            return "zip[xlsx]"
+        else:
+            name_len = unpack_from('<H', zip_data, 0x1a)[0]
+            return "zip{" + zip_data[0x1e:0x1e+name_len].decode('euc-kr') + "}"
 
 if __name__ == "__main__":
-    fat = FAT32("I:\\")
-    print("\n\t========== Carving Start ==========")
-    fat.carving_unallocated()
-    print("\n\t========== Carving Complete ==========")
+    if len(sys.argv) == 2:
+        fat = FAT32(sys.argv[1] + ":\\")
+        print("\n\t========== Carving Start ==========\n")
+        fat.carving_unallocated()
+        print("\n\t========== Carving Complete ==========")
+    else:
+        print("Usage: python3 " + sys.argv[0] + " <drive>")
