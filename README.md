@@ -7,7 +7,7 @@
 Environment
 ============
 
-* OS: Windows 10
+* OS : Windows 10
 * Version : Python 3.6.4
 
 Dependency
