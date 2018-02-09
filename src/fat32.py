@@ -110,7 +110,7 @@ class FAT32:
             self.fat_size * 2 +
             self.cluster_to_sector(cluster_num)
         )
-        while cluster_num < self.free_cluster_count:
+        while cluster_num <= self.free_cluster_count:
             self.data.seek(unalloc_cluster_offset)
             sig = self.match_signature(self.data.read(0x10), unalloc_cluster_offset)
             if sig:
