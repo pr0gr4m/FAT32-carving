@@ -97,8 +97,14 @@ class FAT32:
     def cluster_to_sector(self, cluster):
         return self.sector_per_cluster * cluster
 
+    def carving_all(self):
+        self.carving_ex(1)
+
     def carving_unallocated(self):
-        cluster_num = self.next_free_cluster_location
+        self.carving_ex(self.next_free_cluster_location)
+
+    def carving_ex(self, start_offset):
+        cluster_num = start_offset
         unalloc_cluster_offset = self.sector_to_byte(
             self.reserved_sector +
             self.fat_size * 2 +
@@ -148,10 +154,13 @@ class FAT32:
             return "zip{" + zip_data[0x1e:0x1e+name_len].decode('euc-kr') + "}"
 
 if __name__ == "__main__":
-    if len(sys.argv) == 2:
+    if len(sys.argv) > 1:
         fat = FAT32(sys.argv[1] + ":\\")
         print("\n\t========== Carving Start ==========\n")
-        fat.carving_unallocated()
+        if len(sys.argv) > 2 and sys.argv[2] == "all":
+            fat.carving_all()
+        else:
+            fat.carving_unallocated()
         print("\n\t========== Carving Complete ==========")
     else:
-        print("Usage: python3 " + sys.argv[0] + " <drive>")
+        print("Usage: python3 " + sys.argv[0] + " <drive> [all]")
