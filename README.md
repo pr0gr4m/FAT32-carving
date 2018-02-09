@@ -23,7 +23,7 @@ Usage
 ======
 
 * Require administrator(root) mode
-* <drive> is Drive name as C, D, F, I
+* '''<drive>''' is Drive name as C, D, F, I
 * Select carving mode to add [all]. Default is unallocated mode.
 
 ```
