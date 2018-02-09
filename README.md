@@ -4,10 +4,16 @@
 
 * src/fat32.py : source file
 
+Environment
+============
+
+* OS: Windows 10
+* Version : Python 3.6.4
+
 Dependency
 ===========
 
-* Python3, psutil
+* psutil
 
 ```
 $ pip install psutil
