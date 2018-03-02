@@ -1,7 +1,5 @@
 # FAT32-carving
 
-[BOB6]DF12_Tech_02_박강민
-
 * src/fat32.py : source file
 
 Environment
